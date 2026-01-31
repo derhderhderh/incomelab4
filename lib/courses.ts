@@ -42,13 +42,16 @@ export async function getCourse(id: string): Promise<Course | null> {
 // Get featured courses
 export async function getFeaturedCourses(): Promise<Course[]> {
   const coursesRef = collection(db, COURSES_COLLECTION)
-  const q = query(coursesRef, where("isFeatured", "==", true), orderBy("createdAt", "desc"))
+  // Query only by isFeatured to avoid needing a composite index
+  const q = query(coursesRef, where("isFeatured", "==", true))
   const snapshot = await getDocs(q)
-  return snapshot.docs.map((doc) => ({
+  const courses = snapshot.docs.map((doc) => ({
     id: doc.id,
     ...doc.data(),
     createdAt: doc.data().createdAt?.toDate() || new Date(),
   })) as Course[]
+  // Sort in memory by createdAt descending
+  return courses.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
 }
 
 // Create a new course
@@ -105,8 +108,13 @@ export async function updateLesson(
   const course = await getCourse(courseId)
   if (!course) throw new Error("Course not found")
 
+  // Filter out undefined values to prevent Firebase errors
+  const cleanedLessonData = Object.fromEntries(
+    Object.entries(lessonData).filter(([, value]) => value !== undefined)
+  )
+
   const updatedLessons = course.lessons.map((lesson) =>
-    lesson.id === lessonId ? { ...lesson, ...lessonData } : lesson
+    lesson.id === lessonId ? { ...lesson, ...cleanedLessonData } : lesson
   )
 
   await updateCourse(courseId, { lessons: updatedLessons })
