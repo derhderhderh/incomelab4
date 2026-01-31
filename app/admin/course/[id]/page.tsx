@@ -167,26 +167,33 @@ function CourseEditorContent({ id }: { id: string }) {
     if (!course) return
     setLessonSubmitting(true)
     try {
+      // Build lesson data, only include videoUrl if it has a value
+      const lessonData: {
+        title: string
+        description: string
+        content: string
+        duration: number
+        videoUrl?: string
+        order?: number
+      } = {
+        title: lessonForm.title,
+        description: lessonForm.description,
+        content: lessonForm.content,
+        duration: Number.parseInt(lessonForm.duration) || 0,
+      }
+      
+      // Only add videoUrl if it's not empty
+      if (lessonForm.videoUrl.trim()) {
+        lessonData.videoUrl = lessonForm.videoUrl
+      }
+
       if (editingLesson) {
         // Update existing lesson
-        await updateLesson(course.id, editingLesson.id, {
-          title: lessonForm.title,
-          description: lessonForm.description,
-          content: lessonForm.content,
-          videoUrl: lessonForm.videoUrl || undefined,
-          duration: Number.parseInt(lessonForm.duration) || 0,
-        })
+        await updateLesson(course.id, editingLesson.id, lessonData)
       } else {
         // Create new lesson
-        const newOrder = course.lessons.length + 1
-        await addLessonToCourse(course.id, {
-          title: lessonForm.title,
-          description: lessonForm.description,
-          content: lessonForm.content,
-          videoUrl: lessonForm.videoUrl || undefined,
-          duration: Number.parseInt(lessonForm.duration) || 0,
-          order: newOrder,
-        })
+        lessonData.order = course.lessons.length + 1
+        await addLessonToCourse(course.id, lessonData as Omit<import("@/lib/types").Lesson, "id">)
       }
       // Reload course
       const updated = await getCourse(id)
